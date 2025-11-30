@@ -1,6 +1,8 @@
+
 import React, { useState } from 'react';
 import { Customer, Bot, PricingPlan } from '../types';
 import BotList from './BotList';
+import { api } from '../services/api';
 
 interface CustomerDetailProps {
   customer: Customer;
@@ -18,6 +20,7 @@ const CustomerDetail: React.FC<CustomerDetailProps> = ({
   customer, bots, onBack, onBotSelect, onBotCreate, onBotDelete, onAssignNumber, onConfigureWebhook, plans 
 }) => {
   const [activeTab, setActiveTab] = useState<'stammdaten' | 'zahlung' | 'bots' | 'abrechnung'>('stammdaten');
+  const [localStatus, setLocalStatus] = useState(customer.status);
 
   // Calculate aggregates
   const totalCalls = bots.reduce((acc, bot) => acc + bot.stats.calls, 0);
@@ -30,13 +33,23 @@ const CustomerDetail: React.FC<CustomerDetailProps> = ({
   const includedMin = currentPlan?.includedMinutes || 0;
   const bonusMin = customer.signupBonusRemaining || 0;
   
-  // Logic: First use bonus, then included, then overage
-  // This is a simplified display logic. Real billing logic would be more complex.
   const totalAvailableFree = includedMin + bonusMin;
   const isOverLimit = usedMin > totalAvailableFree;
   const overageMinutes = Math.max(0, usedMin - totalAvailableFree);
   const overageCost = overageMinutes * (currentPlan?.overageRatePerMinute || 0);
   const currentTotal = (customer.billingStats?.baseFee || 0) + overageCost;
+
+  const toggleStatus = async () => {
+      const newStatus = localStatus === 'active' ? 'suspended' : 'active';
+      if (confirm(`Confirm status change to: ${newStatus.toUpperCase()}?`)) {
+          const success = await api.updateCustomerStatus(customer.id, newStatus);
+          if (success) {
+              setLocalStatus(newStatus);
+          } else {
+              alert("Failed to update status");
+          }
+      }
+  };
 
 
   return (
@@ -54,25 +67,40 @@ const CustomerDetail: React.FC<CustomerDetailProps> = ({
                 <div className="flex items-center gap-2 text-xs text-slate-400 mt-1">
                     <span>Kunden-Nr: {customer.id}</span>
                     <span className="w-1 h-1 bg-slate-500 rounded-full"></span>
-                    <span className="text-emerald-400">Aktiv</span>
+                    <span className={`font-bold ${localStatus === 'active' ? 'text-emerald-400' : 'text-red-400'}`}>
+                        {localStatus.toUpperCase()}
+                    </span>
                 </div>
             </div>
         </div>
 
-        {/* Aggregated Stats Section */}
-        <div className="flex items-center gap-8 px-4 border-l border-slate-700/50">
-            <div className="text-right">
-                <div className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-0.5">Active Bots</div>
-                <div className="text-2xl font-bold text-white leading-none">{bots.length}</div>
+        {/* Aggregated Stats & Actions */}
+        <div className="flex items-center gap-8">
+            <div className="flex items-center gap-8 px-4 border-r border-slate-700/50">
+                <div className="text-right">
+                    <div className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-0.5">Active Bots</div>
+                    <div className="text-2xl font-bold text-white leading-none">{bots.length}</div>
+                </div>
+                <div className="text-right">
+                    <div className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-0.5">Total Calls</div>
+                    <div className="text-2xl font-bold text-indigo-300 leading-none">{totalCalls}</div>
+                </div>
+                <div className="text-right">
+                    <div className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-0.5">Minutes</div>
+                    <div className="text-2xl font-bold text-emerald-300 leading-none">{totalMinutes}</div>
+                </div>
             </div>
-            <div className="text-right">
-                <div className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-0.5">Total Calls</div>
-                <div className="text-2xl font-bold text-indigo-300 leading-none">{totalCalls}</div>
-            </div>
-            <div className="text-right">
-                <div className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-0.5">Minutes</div>
-                <div className="text-2xl font-bold text-emerald-300 leading-none">{totalMinutes}</div>
-            </div>
+            
+            <button 
+                onClick={toggleStatus}
+                className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors border ${
+                    localStatus === 'active' 
+                    ? 'border-red-500/50 text-red-400 hover:bg-red-500/10' 
+                    : 'border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10'
+                }`}
+            >
+                {localStatus === 'active' ? 'Block Account' : 'Activate Account'}
+            </button>
         </div>
       </div>
 

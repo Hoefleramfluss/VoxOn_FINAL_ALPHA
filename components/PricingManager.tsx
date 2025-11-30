@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { PricingPlan } from '../types';
 
@@ -23,6 +24,7 @@ const PricingManager: React.FC<PricingManagerProps> = ({ plans, onSavePlan, onDe
       maxConcurrentLines: 1,
       includesPhoneNumber: false,
       phoneNumberMonthlyPrice: 15,
+      extraLineMonthlyPrice: 50,
       features: ['Basic Support'],
       stripeProductId: ''
     };
@@ -238,13 +240,24 @@ const PricingManager: React.FC<PricingManagerProps> = ({ plans, onSavePlan, onDe
                         </div>
 
                         <div>
-                            <label className="block text-xs font-semibold text-slate-400 uppercase mb-1">Max Lines</label>
+                            <label className="block text-xs font-semibold text-slate-400 uppercase mb-1">Max Lines (Default)</label>
                             <input 
                                 type="number" 
                                 value={editingPlan.maxConcurrentLines} 
                                 onChange={e => setEditingPlan({...editingPlan, maxConcurrentLines: parseInt(e.target.value)})}
                                 className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:border-indigo-500 outline-none" 
                             />
+                        </div>
+                        
+                        <div>
+                            <label className="block text-xs font-semibold text-slate-400 uppercase mb-1">Extra Line Price (EUR/mo)</label>
+                            <input 
+                                type="number" 
+                                value={editingPlan.extraLineMonthlyPrice || 0} 
+                                onChange={e => setEditingPlan({...editingPlan, extraLineMonthlyPrice: parseFloat(e.target.value)})}
+                                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:border-indigo-500 outline-none" 
+                            />
+                            <p className="text-xs text-slate-500 mt-1">Cost for customers to buy additional capacity.</p>
                         </div>
 
                         <div className="bg-slate-700/30 p-4 rounded-lg col-span-2 border border-slate-700">

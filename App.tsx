@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Bot, BotConfig, ViewState, VoiceName, Customer, PricingPlan, CallLog, AppNotification } from './types';
+import { Bot, BotConfig, ViewState, VoiceName, Customer, PricingPlan, CallLog, AppNotification, User } from './types';
 import Sidebar from './components/Sidebar';
 import DashboardHome from './components/DashboardHome';
 import CustomerList from './components/CustomerList';
@@ -11,6 +11,9 @@ import PricingManager from './components/PricingManager';
 import NotificationDropdown from './components/NotificationDropdown';
 import TwilioManager from './components/TwilioManager';
 import ServerManager from './components/ServerManager';
+import EmailManager from './components/EmailManager';
+import LoginPage from './components/LoginPage';
+import RegisterPage from './components/RegisterPage';
 import { searchAvailableNumbers, provisionNumber, updatePhoneNumberWebhook } from './services/twilioService';
 import config from './config';
 
@@ -45,6 +48,7 @@ const INITIAL_PLANS: PricingPlan[] = [
         maxConcurrentLines: 1,
         includesPhoneNumber: false,
         phoneNumberMonthlyPrice: 15,
+        extraLineMonthlyPrice: 50,
         features: [
             '100 Min GRATIS (Signup Bonus)',
             'Zahle nur was du verbrauchst',
@@ -66,6 +70,7 @@ const INITIAL_PLANS: PricingPlan[] = [
         maxConcurrentLines: 1,
         includesPhoneNumber: true,
         phoneNumberMonthlyPrice: 0,
+        extraLineMonthlyPrice: 45,
         features: [
             '150 min inkludiert / Monat',
             '1 Telefonleitung',
@@ -87,6 +92,7 @@ const INITIAL_PLANS: PricingPlan[] = [
         maxConcurrentLines: 2,
         includesPhoneNumber: true,
         phoneNumberMonthlyPrice: 0,
+        extraLineMonthlyPrice: 40,
         isPopular: true,
         features: [
             '900 min inkludiert / Monat',
@@ -109,6 +115,7 @@ const INITIAL_PLANS: PricingPlan[] = [
         maxConcurrentLines: 4,
         includesPhoneNumber: true,
         phoneNumberMonthlyPrice: 0,
+        extraLineMonthlyPrice: 35,
         features: [
             '2400 min inkludiert / Monat',
             '4 Telefonleitungen + Warteschleife',
@@ -220,6 +227,8 @@ const INITIAL_NOTIFICATIONS: AppNotification[] = [
 ];
 
 const App: React.FC = () => {
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [authView, setAuthView] = useState<'login' | 'register'>('login');
   const [currentView, setCurrentView] = useState<ViewState>('dashboard');
   
   // Data State
@@ -235,12 +244,38 @@ const App: React.FC = () => {
   // Initialize checks
   useEffect(() => {
     if (!config.useMockData) {
-        // Here you would trigger api.getCustomers() etc.
         console.log("App configured to use REAL BACKEND at: " + config.apiBaseUrl);
     }
   }, []);
 
   // --- ACTIONS ---
+
+  const handleLogin = () => {
+      // Mock Login
+      setCurrentUser({
+          id: 'user_admin',
+          name: 'John Doe',
+          email: 'admin@voiceomni.app',
+          role: 'admin'
+      });
+  };
+
+  const handleRegister = () => {
+      // Mock Register
+      setCurrentUser({
+          id: 'user_new',
+          name: 'New User',
+          email: 'user@company.com',
+          role: 'customer',
+          customerId: 'cust_new'
+      });
+      // Also create customer record...
+  };
+
+  const handleLogout = () => {
+      setCurrentUser(null);
+      setAuthView('login');
+  };
 
   const addNotification = (title: string, message: string, type: 'success' | 'info' | 'warning' | 'error') => {
     const newNotif: AppNotification = {
@@ -263,8 +298,6 @@ const App: React.FC = () => {
   };
 
   const handleCreateCustomer = () => {
-    // In a real app, this would open a modal form
-    // When creating, we apply the signup bonus from the default Pay-as-you-go plan
     const defaultPlan = plans.find(p => p.id === 'plan_payg');
     
     const newCustomer: Customer = {
@@ -289,7 +322,7 @@ const App: React.FC = () => {
         callHistory: []
     };
     setCustomers([newCustomer, ...customers]);
-    addNotification('New Customer Added', `${newCustomer.companyName} has been added with ${newCustomer.signupBonusRemaining} free minutes.`, 'info');
+    addNotification('New Customer Added', `${newCustomer.companyName} has been added.`, 'info');
   };
 
   const handleCreateBot = (customerId: string) => {
@@ -316,7 +349,7 @@ const App: React.FC = () => {
   const handleUpdateBot = (updatedBot: Bot) => {
     setBots(bots.map(b => b.id === updatedBot.id ? updatedBot : b));
     if (updatedBot.status === 'active' && bots.find(b => b.id === updatedBot.id)?.status === 'draft') {
-        addNotification('Bot Deployed Successfully', `${updatedBot.name} is now active and ready to take calls.`, 'success');
+        addNotification('Bot Deployed Successfully', `${updatedBot.name} is now active.`, 'success');
     }
   };
 
@@ -329,7 +362,6 @@ const App: React.FC = () => {
   };
 
   const handleAssignNumber = async (bot: Bot, customer: Customer, plan: PricingPlan) => {
-    // 1. Search for numbers (Mock: Always use German ones for demo)
     const numbers = await searchAvailableNumbers('DE');
     if (numbers.length === 0) {
         addNotification("Provisioning Failed", "No numbers available.", "error");
@@ -337,65 +369,54 @@ const App: React.FC = () => {
     }
     const selectedNumber = numbers[0].phoneNumber;
 
-    // 2. Logic: Charge if not included
     if (!plan.includesPhoneNumber) {
-        const confirmed = confirm(`This plan does not include a free number. Rent ${selectedNumber} for €${plan.phoneNumberMonthlyPrice}/month?`);
+        const confirmed = confirm(`Rent ${selectedNumber} for €${plan.phoneNumberMonthlyPrice}/month?`);
         if (!confirmed) return;
-        
-        // Mock Stripe Charge
-        addNotification("Payment Processing", `Charging ${customer.paymentMethod.type} for €${plan.phoneNumberMonthlyPrice}...`, "info");
+        addNotification("Payment Processing", "Processing rental fee...", "info");
         await new Promise(r => setTimeout(r, 1000));
-        addNotification("Payment Successful", "Stripe payment confirmed.", "success");
-    } else {
-        addNotification("Claiming Number", `Assigning included number to ${bot.name}...`, "info");
     }
 
-    // 3. Provision via Twilio
     const result = await provisionNumber(selectedNumber, bot.id, `https://api.voiceomni.app/webhook/${bot.id}`);
     
-    // 4. Update State
     const updatedBot = { ...bot, phoneNumber: selectedNumber };
     setBots(prev => prev.map(b => b.id === bot.id ? updatedBot : b));
-
-    addNotification("Number Provisioned", `${selectedNumber} is now active and routed to this bot.`, "success");
+    addNotification("Number Provisioned", `${selectedNumber} is now active.`, "success");
   };
 
   const handleConfigureWebhook = async (bot: Bot, phoneNumber: string) => {
     addNotification("Configuring Webhook", `Setting up webhook for ${phoneNumber}...`, "info");
-    
-    // Call service
     await updatePhoneNumberWebhook(phoneNumber, bot.id, `https://api.voiceomni.app/webhook/${bot.id}`);
-
-    // Update Bot State
+    
     const updatedBot = { ...bot, phoneNumber: phoneNumber };
     setBots(prev => prev.map(b => b.id === bot.id ? updatedBot : b));
-
     addNotification("Webhook Configured", `VoiceOmni is now connected to ${phoneNumber}.`, "success");
   };
 
-  // Pricing Actions
   const handleSavePlan = (plan: PricingPlan) => {
     const exists = plans.find(p => p.id === plan.id);
     if (exists) {
         setPlans(plans.map(p => p.id === plan.id ? plan : p));
-        addNotification('Pricing Plan Updated', `${plan.name} configuration has been saved.`, 'success');
+        addNotification('Pricing Plan Updated', `${plan.name} configuration saved.`, 'success');
     } else {
         setPlans([...plans, plan]);
-        addNotification('New Plan Created', `${plan.name} is now available for customers.`, 'success');
+        addNotification('New Plan Created', `${plan.name} is now available.`, 'success');
     }
   };
 
   const handleDeletePlan = (id: string) => {
-    if (confirm('Are you sure you want to delete this package?')) {
+    if (confirm('Delete this package?')) {
         setPlans(plans.filter(p => p.id !== id));
-        addNotification('Plan Deleted', 'Pricing package removed from the system.', 'warning');
+        addNotification('Plan Deleted', 'Pricing package removed.', 'warning');
     }
   };
 
   // --- RENDER LOGIC ---
+  if (!currentUser) {
+      if (authView === 'login') return <LoginPage onLogin={handleLogin} onGoToRegister={() => setAuthView('register')} />;
+      if (authView === 'register') return <RegisterPage onRegister={handleRegister} onGoToLogin={() => setAuthView('login')} />;
+  }
 
   const renderContent = () => {
-    // 1. Bot Editor Overlay (Deepest Level)
     if (editingBotId) {
         const bot = bots.find(b => b.id === editingBotId);
         if (bot) {
@@ -409,22 +430,13 @@ const App: React.FC = () => {
         }
     }
 
-    // 2. Main View Switch
     switch (currentView) {
         case 'dashboard':
-            return (
-                <DashboardHome 
-                    bots={bots} 
-                    customers={customers} 
-                    plans={plans} 
-                />
-            );
-            
+            return <DashboardHome bots={bots} customers={customers} plans={plans} />;
         case 'customers':
             if (selectedCustomerId) {
                 const customer = customers.find(c => c.id === selectedCustomerId);
                 const customerBots = bots.filter(b => b.customerId === selectedCustomerId);
-                
                 if (customer) {
                     return (
                         <CustomerDetail 
@@ -441,44 +453,19 @@ const App: React.FC = () => {
                     );
                 }
             }
-            return (
-                <CustomerList 
-                    customers={customers} 
-                    onSelect={(c) => setSelectedCustomerId(c.id)} 
-                    onCreate={handleCreateCustomer}
-                />
-            );
-
+            return <CustomerList customers={customers} onSelect={(c) => setSelectedCustomerId(c.id)} onCreate={handleCreateCustomer} />;
         case 'pricing':
-            return (
-                <PricingManager 
-                    plans={plans}
-                    onSavePlan={handleSavePlan}
-                    onDeletePlan={handleDeletePlan}
-                />
-            );
-
+            return <PricingManager plans={plans} onSavePlan={handleSavePlan} onDeletePlan={handleDeletePlan} />;
         case 'twilio':
-            return (
-                <TwilioManager 
-                    bots={bots}
-                    customers={customers}
-                    plans={plans}
-                />
-            );
-
+            return <TwilioManager bots={bots} customers={customers} plans={plans} />;
         case 'server':
             return <ServerManager />;
-
+        case 'mails':
+            return <EmailManager />;
         case 'playground':
             return <Playground bots={bots} />;
-            
         case 'settings':
-            return (
-                <div className="p-8 flex items-center justify-center h-full text-slate-500">
-                    Settings Page Placeholder (API Keys, Billing)
-                </div>
-            );
+            return <div className="p-8 text-slate-500">Global Settings (API Keys, Billing)</div>;
         default:
             return <div>Not found</div>;
     }
@@ -486,62 +473,33 @@ const App: React.FC = () => {
 
   return (
     <div className="flex h-screen bg-slate-950 font-sans text-slate-200 overflow-hidden">
-        {/* Sidebar Navigation */}
         <Sidebar currentView={currentView} setCurrentView={(view) => {
             setCurrentView(view);
-            // Reset drill-down states when changing main tabs
             if (view !== 'customers') {
                 setSelectedCustomerId(null);
                 setEditingBotId(null);
             }
         }} />
 
-        {/* Main Content Area */}
         <main className="flex-1 flex flex-col min-w-0 bg-slate-900/50">
-            {/* Header / Breadcrumbs */}
             <header className="h-16 border-b border-slate-800 flex items-center justify-between px-8 bg-slate-900 shrink-0 z-20 relative">
                 <div className="text-sm text-slate-400 breadcrumbs flex items-center gap-2">
                     <span>VoiceOmni</span> 
                     <span>/</span> 
                     <span className="capitalize text-white">{currentView}</span>
-                    
-                    {currentView === 'customers' && selectedCustomerId && (
-                        <>
-                            <span>/</span>
-                            <span className="text-indigo-400">
-                                {customers.find(c => c.id === selectedCustomerId)?.companyName}
-                            </span>
-                        </>
-                    )}
-                    
-                    {editingBotId && (
-                         <>
-                            <span>/</span>
-                            <span className="text-sky-400">Editor</span>
-                        </>
-                    )}
                 </div>
                 
-                {/* Global User Menu & Notifications */}
                 <div className="flex items-center gap-4">
-                     
-                     <NotificationDropdown 
-                        notifications={notifications} 
-                        onMarkAllRead={handleMarkAllRead} 
-                        onClear={handleClearNotifications}
-                     />
-
+                     <NotificationDropdown notifications={notifications} onMarkAllRead={handleMarkAllRead} onClear={handleClearNotifications} />
                      <div className="h-6 w-px bg-slate-700 mx-1"></div>
-
-                     <button className="text-slate-400 hover:text-white flex items-center gap-2">
+                     <button onClick={handleLogout} className="text-slate-400 hover:text-white flex items-center gap-2">
                         <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center">
-                            <span className="text-xs font-bold text-white">JD</span>
+                            <span className="text-xs font-bold text-white">{currentUser.name.substring(0,2).toUpperCase()}</span>
                         </div>
                      </button>
                 </div>
             </header>
 
-            {/* Viewport */}
             <div className="flex-1 overflow-auto relative z-10">
                 {renderContent()}
             </div>

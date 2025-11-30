@@ -1,0 +1,49 @@
+
+version: '3.8'
+
+services:
+  # 1. The Frontend (served via Nginx)
+  frontend:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - VITE_USE_MOCK=false
+      - VITE_API_URL=http://localhost:3000/api
+    depends_on:
+      - backend
+
+  # 2. The Backend API
+  backend:
+    build: ./backend
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - API_KEY=${GEMINI_API_KEY}
+      - REDIS_URL=redis://redis:6379
+      - DB_CONNECTION_STRING=postgres://user:password@postgres:5432/voiceomni
+    depends_on:
+      - redis
+      - postgres
+
+  # 3. Cache / Line Counter
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+
+  # 4. Database
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: voiceomni
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:

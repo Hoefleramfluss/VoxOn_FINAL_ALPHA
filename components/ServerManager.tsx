@@ -1,5 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
+import { api } from '../services/api';
+import config from '../config';
 
 const ServerManager: React.FC = () => {
   // Scaling State
@@ -22,16 +24,24 @@ const ServerManager: React.FC = () => {
   const [logs, setLogs] = useState<string[]>([]);
   const logsEndRef = useRef<HTMLDivElement>(null);
 
-  // Simulation Effects
+  // Real or Simulated Metrics
   useEffect(() => {
-    const interval = setInterval(() => {
-      // Fluctuate stats
-      setCpuUsage(prev => Math.max(10, Math.min(95, prev + (Math.random() * 10 - 5))));
-      setMemoryUsage(prev => Math.max(20, Math.min(90, prev + (Math.random() * 6 - 3))));
-      setRedisUsage(prev => Math.max(5, Math.min(60, prev + (Math.random() * 4 - 2))));
+    const fetchMetrics = async () => {
+        const metrics = await api.getServerMetrics();
+        setCpuUsage(metrics.cpu);
+        setMemoryUsage(metrics.memory);
+        setRedisUsage(metrics.redis);
+        
+        if (!config.useMockData && Math.random() > 0.7) {
+            setLogs(prev => [...prev.slice(-49), `[REAL] ${new Date().toISOString()} Metrics Sync: Active Lines ${metrics.activeLines}`]);
+        }
+    };
 
-      // Add log
-      if (Math.random() > 0.6) {
+    const interval = setInterval(() => {
+      fetchMetrics();
+
+      // Fallback simulation logic for logs if mock
+      if (config.useMockData && Math.random() > 0.6) {
         const timestamp = new Date().toISOString();
         const messages = [
             `[INFO] GET /api/v1/health 200 4ms`,
@@ -44,6 +54,10 @@ const ServerManager: React.FC = () => {
         setLogs(prev => [...prev.slice(-49), `${timestamp} ${msg}`]);
       }
     }, 2000);
+    
+    // Initial fetch
+    fetchMetrics();
+    
     return () => clearInterval(interval);
   }, [minInstances]);
 
@@ -75,8 +89,8 @@ const ServerManager: React.FC = () => {
         </div>
         <div className="flex gap-4">
              <div className="flex items-center gap-2 px-3 py-1 bg-slate-800 rounded border border-slate-700 text-xs text-slate-300">
-                <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-                Region: eu-west-1 (Frankfurt)
+                <span className={`w-2 h-2 rounded-full animate-pulse ${config.useMockData ? 'bg-amber-500' : 'bg-emerald-500'}`}></span>
+                Region: {config.useMockData ? 'Simulated' : 'eu-west-1 (Frankfurt)'}
              </div>
         </div>
       </header>
@@ -210,7 +224,6 @@ const ServerManager: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 min-h-[400px]">
-          
           {/* LOGS TERMINAL */}
           <div className="bg-slate-950 border border-slate-800 rounded-xl flex flex-col overflow-hidden">
               <div className="bg-slate-900 p-3 border-b border-slate-800 flex justify-between items-center">
@@ -269,11 +282,6 @@ const ServerManager: React.FC = () => {
                           ))}
                       </tbody>
                   </table>
-                  <div className="mt-4 pt-4 border-t border-slate-700 flex justify-end">
-                      <button className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-bold rounded shadow-lg shadow-indigo-500/20">
-                          Save Changes & Restart
-                      </button>
-                  </div>
               </div>
           </div>
       </div>

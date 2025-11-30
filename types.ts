@@ -5,6 +5,11 @@ export enum VoiceName {
   Kore = 'Kore',
   Fenrir = 'Fenrir',
   Zephyr = 'Zephyr',
+  Aoede = 'Aoede',
+  Callisto = 'Callisto',
+  Leda = 'Leda',
+  Himalia = 'Himalia',
+  Oberon = 'Oberon'
 }
 
 export interface BotConfig {
@@ -41,8 +46,10 @@ export interface PricingPlan {
   maxConcurrentLines: number;
   includesPhoneNumber: boolean; // Does the plan include a number?
   phoneNumberMonthlyPrice: number; // Price if renting separately
+  extraLineMonthlyPrice?: number; // Price for purchasing additional concurrency
   features: string[];
   stripeProductId: string; // Link to Stripe
+  stripeOveragePriceId?: string;
   isPopular?: boolean;
 }
 
@@ -71,7 +78,7 @@ export interface Customer {
   };
   planId?: string; // Link to PricingPlan
   signupBonusRemaining?: number; // Track remaining one-time bonus
-  status: 'active' | 'inactive';
+  status: 'active' | 'inactive' | 'suspended';
   billingStats?: {
       currentPeriodStart: string;
       currentPeriodEnd: string;
@@ -91,9 +98,57 @@ export interface AppNotification {
   read: boolean;
 }
 
-export type ViewState = 'dashboard' | 'customers' | 'pricing' | 'twilio' | 'server' | 'playground' | 'settings';
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  role: 'admin' | 'customer';
+  customerId?: string; // If role is customer
+}
+
+export interface EmailTemplate {
+  id: string;
+  name: string;
+  subject: string;
+  body: string; // HTML allowed
+  type: 'welcome' | 'reset_password' | 'newsletter' | 'general';
+  lastUpdated: string;
+}
+
+export type ViewState = 'dashboard' | 'customers' | 'pricing' | 'twilio' | 'server' | 'playground' | 'mails' | 'settings';
 
 export interface AudioVisualizerProps {
   analyser: AnalyserNode | null;
   isActive: boolean;
+}
+
+export interface SystemMetrics {
+  cpu: number;
+  memory: number;
+  redis: number;
+  activeLines: number;
+  uptime: number;
+}
+
+// --- TOOL LIBRARY TYPES ---
+
+export interface ToolField {
+  key: string;
+  label: string;
+  type: 'text' | 'password' | 'select' | 'number';
+  options?: string[];
+  placeholder?: string;
+  helperText?: string;
+}
+
+export interface ToolTemplate {
+  id: string;
+  name: string;
+  description: string;
+  category: 'booking' | 'calendar' | 'crm' | 'utility' | 'ecommerce' | 'support' | 'custom';
+  icon: React.ReactNode;
+  fields: ToolField[];
+  // Function to generate the Gemini FunctionDeclaration based on user inputs
+  // Returns either a single object or an array of objects (suites)
+  generate: (inputs: Record<string, any>) => any | any[];
 }

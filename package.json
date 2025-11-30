@@ -11,7 +11,16 @@
   "dependencies": {
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "@google/genai": "^1.30.0"
+    "@google/genai": "^1.30.0",
+    "ws": "^8.18.3",
+    "dotenv": "^17.2.3",
+    "ioredis": "^5.8.2",
+    "@fastify/cors": "^11.1.0",
+    "fastify": "^5.6.2",
+    "@fastify/websocket": "^11.2.0",
+    "stripe": "^20.0.0",
+    "nodemailer": "^7.0.11",
+    "googleapis": "^166.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
